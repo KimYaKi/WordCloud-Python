@@ -8,9 +8,14 @@ from collections import Counter
 import matplotlib.pyplot as plt
 # Flask 웹 서버 구축 라이브러리
 from flask import Flask, request, jsonify
+# 테스트를 위하여 CORS를 처리합니다.
+from flask_cors import CORS
+# 파일에 접근하기 위한 라이브러리를 불러옵니다.
+import os
 
 # 플라스크 웹 서버 객체 생성
 app = Flask(__name__, static_folder='outputs')
+CORS(app)
 
 # 폰트 경로 설정
 font_path = 'NanumGothic.ttf'
@@ -47,8 +52,13 @@ def make_cloud_image(tags, file_name):
     fig = plt.figure(figsize=(10, 10))
     plt.imshow(word_cloud)
     plt.axis("off")
+
+    path = "outputs/{0}.png".format(file_name)
+    # 이미 만들어진 파일이 존재하는 경우 덮어쓰기
+    if os.path.isfile(path):
+        os.remove(path)
     # 만들어진 이미지 객체를 파일 형태로 저장
-    fig.savefig("outputs/{0}.png".format(file_name))
+    fig.savefig(path)
 
 # 단어의 최소 길이와 최대 빈도 수 만큼의 단어만 뽑는다
 def process_from_text(text, max_count, min_length, words, file_name):
@@ -76,11 +86,25 @@ def process():
     # words라는 변수를 출력하도록(json)
     return jsonify(result)
 
+# 이미지 출력을 위한 함수
 @app.route('/outputs', methods=['GET', 'POST'])
 def output():
     text_id = request.args.get('textID')
     return app.send_static_file(text_id + '.png')
 
+# 이미지 존재 여부 확인을 위한 validate()함수
+@app.route('/validate',methods=['GET','POST'])
+def validate():
+    text_id = request.args.get("textID")
+    path = "outputs/{0}.png".format(text_id)
+    result = {}
+    if os.path.isfile(path):
+        result['result'] = True
+    else:
+        result['result'] = False
+    return jsonify(result)
+
 if __name__ == '__main__':
     # 5000 port를 이용하여 구동
-    app.run('127.0.0.1', port=5000)
+    # 처리 속도 향상을 위한 스레드 적용
+    app.run('127.0.0.1', port=5000, threaded=True)
